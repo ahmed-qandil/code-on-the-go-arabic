@@ -14,8 +14,16 @@ object Sentry {
 
 	@JvmStatic
 	fun withScope(callback: (IScope) -> Unit) {}
+
+	@JvmStatic
+	fun configureScope(callback: (IScope) -> Unit) {}
+
+	@JvmStatic
+	fun addBreadcrumb(message: String) {}
 }
 
 interface IScope {
 	fun setTag(key: String, value: String)
+
+	fun setExtra(key: String, value: String)
 }

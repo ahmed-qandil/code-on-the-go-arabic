@@ -9,8 +9,6 @@ import com.itsaky.androidide.lsp.kotlin.compiler.read
 import com.itsaky.androidide.lsp.kotlin.utils.toNioPathOrNull
 import com.itsaky.androidide.progress.ICancelChecker
 import com.itsaky.androidide.projects.FileManager
-import io.sentry.Attachment
-import io.sentry.Sentry
 import kotlinx.coroutines.CancellationException
 import org.appdevforall.codeonthego.indexing.jvm.JvmClassInfo
 import org.appdevforall.codeonthego.indexing.jvm.JvmFieldInfo
@@ -180,7 +178,6 @@ internal suspend fun indexSourceFile(
 				logger.debug("Skipping index pass for {}: dependency jar unavailable", newFile.filePath, e)
 			} else {
 				logger.error("Failed to index {}", newFile.filePath, e)
-				Sentry.captureException(e)
 			}
 			return false
 		}
@@ -212,22 +209,6 @@ private fun KaSession.analyzeDeclaration(
 		if (err.isMissingClasspathFile()) {
 			logger.debug("Skipping symbol in {}: dependency jar unavailable during indexing", filePath, err)
 			return@onFailure
-		}
-		Sentry.captureException(err) { scope ->
-			scope.apply {
-				setExtra("fpth", filePath)
-				setExtra("dcl", dcl.name)
-				setExtra("dcl.dbg", dcl.getDebugText())
-				setExtra(
-					"par.dbg",
-					(dcl.parent as? KtElement)?.getDebugText() ?: dcl.parent?.toString() ?: "none",
-				)
-				if (err is KotlinExceptionWithAttachments) {
-					err.attachments.forEach { attachment ->
-						scope.addAttachment(Attachment(attachment.bytes, attachment.path))
-					}
-				}
-			}
 		}
 	}.getOrNull()
 }

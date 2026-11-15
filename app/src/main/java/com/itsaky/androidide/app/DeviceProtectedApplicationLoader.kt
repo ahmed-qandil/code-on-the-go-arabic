@@ -17,7 +17,6 @@ import com.itsaky.androidide.events.LspApiEventsIndex
 import com.itsaky.androidide.events.LspJavaEventsIndex
 import com.itsaky.androidide.events.ProjectsApiEventsIndex
 import com.itsaky.androidide.handlers.CrashEventSubscriber
-import com.itsaky.androidide.handlers.GlitchTipDiagnosticsContext
 import com.itsaky.androidide.handlers.MetricsCrashAttachment
 import com.itsaky.androidide.logging.provider.IdeLogRouter
 import com.itsaky.androidide.preferences.internal.StatPreferences
@@ -38,7 +37,6 @@ import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 import org.slf4j.LoggerFactory
 import org.slf4j.event.Level
-import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.system.exitProcess
 
 /**
@@ -53,7 +51,6 @@ internal object DeviceProtectedApplicationLoader :
 	private val crashEventSubscriber = CrashEventSubscriber()
 	val analyticsManager: IAnalyticsManager by inject()
 
-	private val telemetryInitialized = AtomicBoolean(false)
 
 	private const val KEY_LEGACY_PRIVACY_DISCLOSURE_SHOWN = "privacy.disclosure.shown"
 

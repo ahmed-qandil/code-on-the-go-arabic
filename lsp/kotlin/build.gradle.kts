@@ -81,7 +81,6 @@ dependencies {
 	implementation(libs.common.kotlin)
 	implementation(libs.common.kotlin.coroutines.core)
 	implementation(libs.common.kotlin.coroutines.android)
-	implementation(libs.sentry.android.core)
 
 	implementation(libs.ktfmt) {
 		exclude(group = "org.jetbrains.kotlin", module = "kotlin-compiler-embeddable")

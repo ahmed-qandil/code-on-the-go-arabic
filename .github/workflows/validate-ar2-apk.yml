@@ -14,6 +14,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 120
     steps:
+      - uses: actions/checkout@v4
+
       - name: Download published APK, verify hash, test-sign a copy
         run: |
           curl -sL -o cogo.apk "https://github.com/ahmed-qandil/code-on-the-go-arabic/releases/download/v26.46-ar2/CodeOnTheGo-v8-release-1115-1351.apk"
@@ -43,7 +45,7 @@ jobs:
           heap-size: 512M
           disk-size: 14G
           emulator-options: -no-window -no-snapshot-save -noaudio -no-boot-anim -gpu swiftshader_indirect
-          script: bash ci/validate_ar2.sh
+          script: bash $GITHUB_WORKSPACE/ci/validate_ar2.sh
 
       - name: Upload evidence
         if: always()

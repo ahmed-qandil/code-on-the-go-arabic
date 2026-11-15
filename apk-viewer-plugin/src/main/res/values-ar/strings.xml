@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">محلل APK</string>
+    <string name="plugin_title">محلل APK</string>
+    <string name="plugin_description">تحليل بنية APK وأحجام الملفات والبيانات الوصفية</string>
+    <string name="apk_analyzer">محلل APK</string>
+    <string name="apk_analyzer_tooltip">تحليل بنية APK ومحتوياته</string>
+    <string name="analyze_apk">تحليل APK</string>
+    <string name="select_apk">اختر APK للتحليل</string>
+    <string name="analyzing_apk">جارٍ تحليل APK…</string>
+    <string name="analysis_failed">فشل تحليل APK: %s</string>
+    <string name="section_apk_structure">بنية APK</string>
+    <string name="section_key_files">الملفات الرئيسية</string>
+    <string name="section_native_libraries">المكتبات الأصلية (%d)</string>
+    <string name="section_resource_directories">مجلدات الموارد (%d)</string>
+    <string name="section_large_files">الملفات الكبيرة (&gt;100KB)</string>
+    <string name="section_apk_metadata">بيانات APK الوصفية</string>
+    <string name="header_property">الخاصية</string>
+    <string name="header_value">القيمة</string>
+    <string name="header_file">الملف</string>
+    <string name="header_raw">الخام</string>
+    <string name="header_compressed">المضغوط</string>
+    <string name="header_ratio">النسبة</string>
+    <string name="header_name">الاسم</string>
+    <string name="header_count">العدد</string>
+    <string name="header_directory">المجلد</string>
+    <string name="header_files">الملفات</string>
+    <string name="label_apk_file_size">حجم ملف APK</string>
+    <string name="label_total_entries">إجمالي الإدخالات</string>
+    <string name="label_uncompressed_size">الحجم غير المضغوط</string>
+    <string name="label_compressed_size">الحجم المضغوط</string>
+    <string name="label_compression_ratio">نسبة الضغط</string>
+    <string name="label_directories">المجلدات</string>
+    <string name="label_files">الملفات</string>
+    <string name="label_signature_scheme">نظام التوقيع</string>
+    <string name="label_multi_dex">Multi-DEX</string>
+    <string name="label_code_obfuscation">تشويش الكود</string>
+    <string name="value_yes">نعم</string>
+    <string name="value_no">لا</string>
+    <string name="value_detected">مكتشَف</string>
+    <string name="value_none_detected">لم يُكتشف شيء</string>
+    <string name="value_v1_signing">v1 (توقيع JAR)</string>
+    <string name="value_v2_or_unsigned">v2+ أو غير موقّع</string>
+    <string name="value_na">غير متاح</string>
+    <string name="action_show_all">عرض الكل (%d)</string>
+</resources>

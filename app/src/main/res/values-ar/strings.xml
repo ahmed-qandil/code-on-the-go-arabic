@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="pref_use_simple_local_prompt">استخدام طلب مبسّط</string>
+    <string name="msg_strings_injection_failed">فشل تحديث موارد السلاسل النصية المولّدة.</string>
+    <string name="msg_strings_injection_file_not_found">تعذّر العثور على ملف موارد السلاسل النصية للمشروع.</string>
+    <string name="msg_strings_injection_parser_unsupported">هذا الجهاز لا يدعم إعداد محلل XML المطلوب لتحديث موارد السلاسل النصية المولّدة.</string>
+    <string name="msg_strings_injection_invalid_xml">موارد السلاسل النصية المولّدة ليست XML صالحًا.</string>
+    <string name="msg_floating_window_open_failed">تعذّر فتح “%1$s” في نافذة عائمة.</string>
+</resources>

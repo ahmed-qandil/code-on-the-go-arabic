@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">معاين Markdown</string>
+    <string name="plugin_title">معاينة الملف</string>
+    <string name="plugin_description">معاينة ملفات Markdown وHTML بعرض حي</string>
+    <string name="select_from_project">المشروع</string>
+    <string name="select_from_storage">التخزين</string>
+    <string name="refresh">تحديث</string>
+    <string name="view_source">المصدر</string>
+    <string name="view_preview">معاينة</string>
+    <string name="empty_state_title">لم يُحدد ملف</string>
+    <string name="empty_state_subtitle">اختر ملفًا من مشروعك أو من تخزين الجهاز لمعاينته</string>
+    <string name="supported_formats">المدعوم: .md, .markdown, .html, .htm</string>
+    <string name="loading">جارٍ التحميل…</string>
+    <string name="no_project">لا يوجد مشروع متاح</string>
+    <string name="no_files_found">لم يتم العثور على ملفات مدعومة</string>
+    <string name="file_not_found">الملف غير موجود</string>
+    <string name="cannot_read_file">تعذّرت قراءة الملف</string>
+    <string name="preview_file">معاينة الملف</string>
+    <string name="preview_markdown">معاينة Markdown</string>
+    <string name="preview_html">معاينة HTML</string>
+</resources>

@@ -25,6 +25,7 @@ import com.android.build.gradle.AppExtension
 import com.android.build.gradle.BaseExtension
 import com.itsaky.androidide.build.config.BuildConfig
 import com.itsaky.androidide.build.config.projectVersionCode
+import com.itsaky.androidide.build.config.releaseVersion
 import com.itsaky.androidide.build.config.simpleVersionName
 import com.itsaky.androidide.plugins.util.SdkUtils.getAndroidJar
 import org.gradle.api.GradleException
@@ -136,7 +137,7 @@ fun Project.configureAndroidModule(coreLibDesugDep: Provider<MinimalExternalModu
 			minSdk = BuildConfig.MIN_SDK
 			targetSdk = BuildConfig.TARGET_SDK
 			versionCode = projectVersionCode
-			versionName = rootProject.simpleVersionName
+			versionName = rootProject.releaseVersion.ifEmpty { rootProject.simpleVersionName }
 
 			// required
 			multiDexEnabled = true

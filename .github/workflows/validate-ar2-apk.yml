@@ -1,0 +1,84 @@
+name: Validate published ar2 APK (runtime, emulator)
+
+# Manual validation only: installs the EXACT published release APK on an
+# Android emulator and captures runtime evidence (boot, locale ar-EG, install,
+# launch, UI dumps, screenshots, extraction progress). Never builds product.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: Download published APK and verify sha256
+        run: |
+          curl -sL -o cogo.apk "https://github.com/ahmed-qandil/code-on-the-go-arabic/releases/download/v26.46-ar2/CodeOnTheGo-v8-release-1115-1351.apk"
+          echo "5b2439625b25a597834f3ce28e4cf6de19a180e90ff54f5442dd0ceefcb05bf5  cogo.apk" | sha256sum -c -
+          ls -la cogo.apk
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          ram-size: 4096M
+          heap-size: 512M
+          disk-size: 14G
+          emulator-options: -no-snapshot-save -noaudio -no-boot-anim -gpu swiftshader_indirect
+          script: |
+            set -x
+            mkdir -p evidence
+            echo "aW1wb3J0IHJlLCBzdWJwcm9jZXNzLCBzeXMKdGFyZ2V0cyA9IFsnaW5zdGFsbCcsICdzZXR1cCcsICdjb250aW51ZScsICduZXh0JywgJ3N0YXJ0JywgJ2dldCBzdGFydGVkJywgJ2RvbmUnLCAnYWdyZWUnLCAnYWNjZXB0JywgJ2dyYW50JywgJ2FsbG93JywgJ29rJywKICAgICAgICAgICAn2KrYq9io2YrYqicsICfYpdi52K/Yp9ivJywgJ9mF2KrYp9io2LnYqScsICfYp9mE2KrYp9mE2YonLCAn2KfYqNiv2KMnLCAn2KjYr9ihJywgJ9iq2YUnLCAn2YXZiNin2YHZgicsICfYs9mF2KfYrScsICfYrdiz2YbYpycsICfYp9iz2KrZhdix2KfYsSddCnRyeToKICAgIHhtbCA9IG9wZW4oJy90bXAvd2luZG93LnhtbCcsIGVuY29kaW5nPSd1dGYtOCcpLnJlYWQoKQpleGNlcHQgRmlsZU5vdEZvdW5kRXJyb3I6CiAgICBzeXMuZXhpdCgwKQpub2RlcyA9IHJlLmZpbmRhbGwocic8bm9kZVtePl0qPicsIHhtbCkKYmVzdCA9IE5vbmUKZm9yIG4gaW4gbm9kZXM6CiAgICB0ZXh0ID0gcmUuc2VhcmNoKHIndGV4dD0iKFteIl0qKSInLCBuKQogICAgYiA9IHJlLnNlYXJjaChyJ2JvdW5kcz0iXFsoXGQrKSwoXGQrKVxdXFsoXGQrKSwoXGQrKVxdIicsIG4pCiAgICBlbmFibGVkID0gcmUuc2VhcmNoKHInZW5hYmxlZD0idHJ1ZSInLCBuKQogICAgaWYgbm90ICh0ZXh0IGFuZCBiIGFuZCBlbmFibGVkKToKICAgICAgICBjb250aW51ZQogICAgdCA9IHRleHQuZ3JvdXAoMSkuc3RyaXAoKS5sb3dlcigpCiAgICBpZiB0IGFuZCBhbnkodyBpbiB0IGZvciB3IGluIHRhcmdldHMpOgogICAgICAgIHggPSAoaW50KGIuZ3JvdXAoMSkpICsgaW50KGIuZ3JvdXAoMykpKSAvLyAyCiAgICAgICAgeSA9IChpbnQoYi5ncm91cCgyKSkgKyBpbnQoYi5ncm91cCg0KSkpIC8vIDIKICAgICAgICBiZXN0ID0gKHgsIHksIHQpCiAgICAgICAgYnJlYWsKaWYgYmVzdDoKICAgIHByaW50KCdUQVBQSU5HOicsIGJlc3QpCiAgICBzdWJwcm9jZXNzLnJ1bihbJ2FkYicsICdzaGVsbCcsICdpbnB1dCcsICd0YXAnLCBzdHIoYmVzdFswXSksIHN0cihiZXN0WzFdKV0pCmVsc2U6CiAgICBwcmludCgnbm8gdGFwcGFibGUgdGFyZ2V0JykK" | base64 -d > /tmp/tap_text.py
+            echo "dHJ5OgogICAgcyA9IG9wZW4oJy90bXAvd2luZG93LnhtbCcsIGVuY29kaW5nPSd1dGYtOCcpLnJlYWQoKQogICAgcHJpbnQoc3VtKDEgZm9yIGMgaW4gcyBpZiAn2IAnIDw9IGMgPD0gJ9u/JykpCmV4Y2VwdCBFeGNlcHRpb246CiAgICBwcmludCgwKQo=" | base64 -d > /tmp/count_ar.py
+            adb root || true
+            sleep 8
+            adb wait-for-device
+            until [ "$(adb shell getprop sys.boot_completed | tr -d '\r')" = "1" ]; do sleep 5; done
+            adb shell setprop persist.sys.locale ar-EG
+            adb shell settings put system system_locales ar-EG || true
+            adb shell setprop ctl.restart zygote
+            sleep 30
+            adb wait-for-device
+            until [ "$(adb shell getprop sys.boot_completed | tr -d '\r')" = "1" ]; do sleep 5; done
+            adb shell settings get system system_locales
+            adb shell getprop persist.sys.locale
+
+            echo '=== install ==='
+            adb install cogo.apk
+            adb shell pm list packages | grep itsaky || echo 'PACKAGE NOT FOUND'
+            adb shell dumpsys package com.itsaky.androidide | grep -E 'versionName|primaryCpuAbi' || true
+
+            echo '=== launch ==='
+            adb shell monkey -p com.itsaky.androidide -c android.intent.category.LAUNCHER 1
+            sleep 20
+
+            for i in $(seq 1 36); do
+              adb exec-out screencap -p > evidence/shot-$i.png 2>/dev/null || true
+              adb shell uiautomator dump /sdcard/window.xml >/dev/null 2>&1 || true
+              adb pull /sdcard/window.xml /tmp/window.xml >/dev/null 2>&1 || true
+              cp /tmp/window.xml evidence/ui-$i.xml 2>/dev/null || true
+              AR=$(python3 /tmp/count_ar.py || echo 0)
+              SIZE=$(adb shell du -s /data/data/com.itsaky.androidide 2>/dev/null | tr -d '\r' || true)
+              echo "[$i] arabic_chars_in_ui=$AR appdata=$SIZE"
+              python3 /tmp/tap_text.py || true
+              sleep 30
+            done
+
+            adb shell pm path com.itsaky.androidide
+            adb shell du -s /data/data/com.itsaky.androidide || true
+
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: emulator-evidence
+          path: evidence/
+          retention-days: 14

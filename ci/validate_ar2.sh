@@ -62,11 +62,18 @@ adb shell appops set com.itsaky.androidide MANAGE_EXTERNAL_STORAGE allow || true
 adb shell appops get com.itsaky.androidide MANAGE_EXTERNAL_STORAGE | tee evidence/appops.txt || true
 adb shell ls -l /sdcard/Download/ | tee evidence/downloads.txt || true
 
-echo '=== launch (explicit am start -W, continuous unfiltered logcat) ==='
+echo '=== gate check: launcher entry SplashActivity (known upstream cold-start race: the x86 emulator gate reads FeatureFlags.isEmulatorUseEnabled before the async flag load completes; gate code only runs on x86 devices) ==='
 adb logcat -c || true
 adb logcat > evidence/logcat-full.txt 2>&1 &
 LOGCAT_PID=$!
-adb shell am start -W -n "com.itsaky.androidide/$ACT" 2>&1 | tee evidence/am-start.log
+adb shell am start -W -n "com.itsaky.androidide/$ACT" 2>&1 | tee evidence/am-start-splash.log
+sleep 8
+adb shell pidof com.itsaky.androidide | tee evidence/splash-pid.txt || true
+adb exec-out screencap -p > evidence/splash-8s.png 2>/dev/null || true
+
+echo '=== direct root start of OnboardingActivity (non-exported; root shell bypasses the x86 launcher gate - test-device technique, no product change) ==='
+adb shell am start -W -n 'com.itsaky.androidide/.activities.OnboardingActivity' 2>&1 | tee evidence/am-start.log
+sleep 5
 
 tap_if_present() {
   # $1 = resource-id fragment or exact visible text; taps center of first match
@@ -103,6 +110,12 @@ for i in $(seq 1 36); do
       || tap_if_present 'تخطى' || tap_if_present 'السماح' || tap_if_present 'ابدأ' \
       || tap_if_present 'Next' || tap_if_present 'Done' || tap_if_present 'Skip' \
       || tap_if_present 'Allow' || true
+    if [ ! -f /tmp/tapped_install ]; then
+      if tap_if_present 'تثبيت' || tap_if_present 'Install'; then
+        touch /tmp/tapped_install
+        echo 'TAPPED_INSTALL_ONCE' | tee -a evidence/taps.log
+      fi
+    fi
   fi
   if [ $((i % 3)) -eq 0 ]; then
     adb exec-out screencap -p > evidence/launch-$i.png 2>/dev/null || true

@@ -24,7 +24,6 @@ jobs:
         run: |
           set -euo pipefail
           base=https://dev-assets.appdevforall.org/release
-          cd app
           mkdir -p assets/release/common/data/common assets/release/common/database assets/release/v8/data/common
           curl -fSL "$base/gradle-9.6.1-bin.zip.br"        -o assets/release/common/data/common/gradle-9.6.1-bin.zip.br
           curl -fSL "$base/gradle-api-9.6.1.jar.br"        -o assets/release/common/data/common/gradle-api-9.6.1.jar.br

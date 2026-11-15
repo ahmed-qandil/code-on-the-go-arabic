@@ -15,7 +15,6 @@ import com.itsaky.androidide.lsp.kotlin.diagnostic.collectDiagnosticsFor
 import com.itsaky.androidide.lsp.kotlin.utils.SymbolVisibilityChecker
 import com.itsaky.androidide.projects.FileManager
 import com.itsaky.androidide.utils.KeyedDebouncingAction
-import io.sentry.Sentry
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineName
@@ -221,9 +220,7 @@ internal class CompilationEnvironment(
 	}
 
 	fun refreshSources() {
-		Sentry.addBreadcrumb("refreshSources (env=$name, modules=${modules.size})")
 		project.writeUnlessDisposed {
-			Sentry.addBreadcrumb("refreshSources(env=$name): in-progress")
 			ResolutionScopeProvider.getInstance(project).invalidateAll()
 			modules
 				.asFlatSequence()

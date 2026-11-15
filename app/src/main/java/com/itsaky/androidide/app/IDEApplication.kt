@@ -31,7 +31,6 @@ import com.itsaky.androidide.di.coreModule
 import com.itsaky.androidide.di.pluginModule
 import com.itsaky.androidide.di.quickBuildModule
 import com.itsaky.androidide.di.templateModule
-import com.itsaky.androidide.handlers.GlitchTipDiagnosticsContext
 import com.itsaky.androidide.plugins.manager.core.PluginManager
 import com.itsaky.androidide.treesitter.TreeSitter
 import com.itsaky.androidide.utils.RecyclableObjectPool
@@ -89,9 +88,7 @@ class IDEApplication :
 			) {
 				if (intent?.action == Intent.ACTION_USER_UNLOCKED) {
 					runCatching { unregisterReceiver(this) }
-					// Stamp the unlock time so GlitchTip's boot_mode context reflects the
 					// live state and can report the direct-boot locked duration.
-					GlitchTipDiagnosticsContext.onUserUnlocked()
 					coroutineScope.launch(Dispatchers.Default) {
 						logger.info("Device unlocked! Loading all components...")
 						CredentialProtectedApplicationLoader.load(this@IDEApplication)

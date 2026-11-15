@@ -44,11 +44,9 @@ import com.itsaky.androidide.adapters.onboarding.OnboardingPermissionsAdapter
 import com.itsaky.androidide.app.DeviceProtectedApplicationLoader
 import com.itsaky.androidide.app.IDEApplication
 import com.itsaky.androidide.buildinfo.BuildInfo
-import com.itsaky.androidide.databinding.LayoutDialogPrivacyConsentBinding
 import com.itsaky.androidide.databinding.LayoutOnboardingPermissionsBinding
 import com.itsaky.androidide.events.InstallationEvent
 import com.itsaky.androidide.preferences.internal.StatPreferences
-import com.itsaky.androidide.preferences.internal.TelemetryConsent
 import com.itsaky.androidide.tasks.doAsyncWithProgress
 import com.itsaky.androidide.utils.DialogUtils
 import com.itsaky.androidide.utils.OverlayPermissionGuide
@@ -61,7 +59,6 @@ import com.itsaky.androidide.utils.viewLifecycleScope
 import com.itsaky.androidide.utils.viewLifecycleScopeOrNull
 import com.itsaky.androidide.viewmodel.InstallationState
 import com.itsaky.androidide.viewmodel.InstallationViewModel
-import io.sentry.Sentry
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.first
@@ -101,8 +98,6 @@ class PermissionsFragment :
 		PermissionsHelper.getRequiredPermissions(requireContext())
 	}
 
-	private var privacyDialog: AlertDialog? = null
-	private var consentResolutionJob: Job? = null
 	private var isSlideSelected = false
 
 	companion object {
@@ -165,7 +160,6 @@ class PermissionsFragment :
 		(activity as? OnboardingActivity)?.setOnboardingChromeVisible(false)
 		onPermissionsUpdated()
 		if (isSlideSelected) {
-			showPrivacyDialogIfNeeded()
 		}
 	}
 
@@ -228,9 +222,6 @@ class PermissionsFragment :
 
 	override fun onDestroyView() {
 		super.onDestroyView()
-		privacyDialog?.dismiss()
-		privacyDialog = null
-		consentResolutionJob = null
 		permissionsBinding = null
 		recyclerView = null
 		finishButton = null
@@ -408,56 +399,10 @@ class PermissionsFragment :
 
 	override fun onSlideSelected() {
 		isSlideSelected = true
-		showPrivacyDialogIfNeeded()
 	}
 
 	override fun onSlideDeselected() {
 		isSlideSelected = false
-	}
-
-	private fun showPrivacyDialogIfNeeded() {
-		if (privacyDialog != null || consentResolutionJob?.isActive == true) {
-			return
-		}
-
-		val scope = viewLifecycleScopeOrNull ?: return
-		consentResolutionJob =
-			scope.launch {
-				val consent = withContext(Dispatchers.IO) { StatPreferences.telemetryConsent }
-				if (consent == TelemetryConsent.UNSET && privacyDialog == null) {
-					showPrivacyDialog()
-				}
-			}
-	}
-
-	private fun showPrivacyDialog() {
-		val builder = DialogUtils.newMaterialDialogBuilder(requireContext())
-
-		// Inflate from the builder's themed context so the dialog-scoped attributes the
-		// layout refers to (body text style, preferred padding) resolve.
-		val binding = LayoutDialogPrivacyConsentBinding.inflate(LayoutInflater.from(builder.context))
-
-		val dialog =
-			builder
-				.setTitle(com.itsaky.androidide.resources.R.string.privacy_disclosure_title)
-				.setView(binding.root)
-				.setCancelable(false)
-				.create()
-
-		binding.privacyAccept.setOnClickListener {
-			StatPreferences.telemetryConsent = TelemetryConsent.GRANTED
-			DeviceProtectedApplicationLoader.onTelemetryConsentGranted(IDEApplication.instance)
-			dialog.dismiss()
-		}
-
-		binding.privacyDecline.setOnClickListener {
-			StatPreferences.telemetryConsent = TelemetryConsent.DECLINED
-			Sentry.close()
-			dialog.dismiss()
-		}
-
-		privacyDialog = dialog
-		dialog.show()
 	}
 
 	private fun enableFinishButton() {

@@ -79,6 +79,10 @@ class OnboardingActivity : AppIntro2() {
 
 		super.onCreate(savedInstanceState)
 
+		// The onboarding/setup screens are not RTL-aware; force LTR layout so the
+		// setup flow works in Arabic without switching the system language.
+		window.decorView.layoutDirection = View.LAYOUT_DIRECTION_LTR
+
 		WindowCompat.getInsetsController(this.window, this.window.decorView).apply {
 			isAppearanceLightStatusBars = !isSystemInDarkMode()
 			isAppearanceLightNavigationBars = !isSystemInDarkMode()

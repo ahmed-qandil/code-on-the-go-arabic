@@ -29,11 +29,6 @@ import com.itsaky.androidide.utils.FeatureFlags
 import com.itsaky.androidide.utils.MetricsScratch
 import com.termux.shared.reflection.ReflectionUtils
 import io.github.rosemoe.sora.widget.schemes.EditorColorScheme
-import io.sentry.Breadcrumb
-import io.sentry.Sentry
-import io.sentry.SentryLevel
-import io.sentry.android.core.SentryAndroid
-import io.sentry.protocol.User
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -84,7 +79,6 @@ internal object DeviceProtectedApplicationLoader :
 			),
 		)
 
-		migrateLegacyConsent(app)
 		initTelemetryIfConsented(app)
 
 		ShizukuSettings.initialize()
@@ -110,110 +104,8 @@ internal object DeviceProtectedApplicationLoader :
 	}
 
 	suspend fun initTelemetryIfConsented(app: IDEApplication) {
-		if (StatPreferences.telemetryConsent != TelemetryConsent.GRANTED) {
-			logger.info("Telemetry not initialized (consent={})", StatPreferences.telemetryConsent)
-			return
-		}
-
-		if (!telemetryInitialized.compareAndSet(false, true)) {
-			return
-		}
-
-		runCatching {
-			// Initialize the Sentry SDK; it reports to our GlitchTip backend
-			// (GlitchTip is Sentry-protocol-compatible), so the SDK types stay io.sentry.
-			SentryAndroid.init(app) { options ->
-				options.environment =
-					if (BuildConfig.DEBUG) IDEApplication.GLITCHTIP_ENV_DEV else IDEApplication.GLITCHTIP_ENV_PROD
-
-				// Enrich every GlitchTip event with app-specific diagnostic context.
-				GlitchTipDiagnosticsContext.install(options)
-
-				// And with what the machine was doing in the minutes before it (ADFA-5526). The
-				// destinations that snapshot writes into are taken now, while failing to get them is
-				// survivable -- a crash handler is the wrong place to ask for memory.
-				MetricsScratch.install()
-				MetricsCrashAttachment.install(options, app)
-			}
-
-			// Forward INFO+ logs to GlitchTip as breadcrumbs (never as events; crash events are
-			// only ever sent via explicit Sentry.captureException calls elsewhere). INFO matches
-			// the old SentryAppender's setMinimumBreadcrumbLevel(Level.INFO) - that threshold is
-			// independent of setMinimumLevel(Level.WARN), which only gated the separate,
-			// unused "Sentry Logs" feature.
-			IdeLogRouter.addSink { level, loggerName, message, _ ->
-				if (level.toInt() >= Level.INFO.toInt()) {
-					Sentry.addBreadcrumb(
-						Breadcrumb().apply {
-							category = loggerName
-							this.message = message
-							this.level =
-								when (level) {
-									Level.ERROR -> SentryLevel.ERROR
-									Level.WARN -> SentryLevel.WARNING
-									Level.INFO -> SentryLevel.INFO
-									else -> SentryLevel.DEBUG
-								}
-						},
-					)
-				}
-			}
-
-			Sentry.setUser(
-				User().apply {
-					id = Settings.Secure.getString(app.contentResolver, Settings.Secure.ANDROID_ID)
-					username = "${Build.MANUFACTURER} ${Build.MODEL}"
-				},
-			)
-		}.onFailure {
-			logger.error("Failed to initialize crash and log reporting", it)
-		}
-
-		withContext(Dispatchers.Main) {
-			initializeAnalytics()
-		}
-
-		trackAttachedDevicesMetric(app)
-	}
-
-	fun onTelemetryConsentGranted(app: IDEApplication) {
-		app.coroutineScope.launch(Dispatchers.Default) {
-			initTelemetryIfConsented(app)
-		}
-	}
-
-	internal fun shouldMigrateLegacyConsent(
-		currentConsent: TelemetryConsent,
-		legacyDisclosureShown: Boolean,
-	): Boolean = currentConsent == TelemetryConsent.UNSET && legacyDisclosureShown
-
-	private fun migrateLegacyConsent(app: IDEApplication) {
-		val legacyDisclosureShown =
-			app.prefManager.getBoolean(KEY_LEGACY_PRIVACY_DISCLOSURE_SHOWN, false)
-		if (shouldMigrateLegacyConsent(StatPreferences.telemetryConsent, legacyDisclosureShown)) {
-			logger.info("Migrating legacy privacy disclosure acceptance to telemetry consent")
-			StatPreferences.telemetryConsent = TelemetryConsent.GRANTED
-		}
-	}
-
-	private fun initializeAnalytics() {
-		try {
-			ProcessLifecycleOwner.get().lifecycle.addObserver(this)
-			analyticsManager.initialize()
-			logger.info("Firebase Analytics initialized successfully")
-		} catch (e: Exception) {
-			logger.error("Failed to initialize Firebase Analytics", e)
-		}
-	}
-
-	private fun trackAttachedDevicesMetric(app: IDEApplication) {
-		try {
-			analyticsManager.trackMetric(
-				AttachedDevicesMetric(AttachedDevicesCollector.collect(app)),
-			)
-		} catch (e: Exception) {
-			logger.error("Failed to report attached devices metric", e)
-		}
+		// Crash/usage telemetry (Sentry/GlitchTip, Firebase Analytics) has been removed
+		// from this build; nothing to initialize.
 	}
 
 	fun handleUncaughtException(
@@ -221,9 +113,8 @@ internal object DeviceProtectedApplicationLoader :
 		exception: Throwable,
 	) {
 		// we can't write logs to files, nor we can show the crash handler
-		// activity to the user. Just report to GlitchTip and exit.
+		// activity to the user. Just exit.
 
-		Sentry.captureException(exception)
 		IDEApplication.instance.uncaughtExceptionHandler?.uncaughtException(thread, exception)
 		exitProcess(EXIT_CODE_CRASH)
 	}

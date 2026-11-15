@@ -42,9 +42,6 @@ plugins {
 	id("kotlin-parcelize")
 	id("androidx.navigation.safeargs.kotlin")
 	id("com.itsaky.androidide.desugaring")
-	// Sentry gradle plugin; the SDK it wires up reports to our GlitchTip backend.
-	alias(libs.plugins.sentry)
-	alias(libs.plugins.google.services)
 	alias(libs.plugins.kotlin.compose)
 }
 
@@ -59,7 +56,6 @@ val props =
 		if (file.exists()) load(file.inputStream())
 	}
 
-val glitchtipDsn = props.getProperty("glitchtipDsn") ?: propOrEnv("GLITCHTIP_DSN")
 
 apply {
 	plugin(AndroidIDEAssetsPlugin::class.java)
@@ -100,16 +96,13 @@ android {
 	buildTypes {
 		debug {
 			signingConfig = signingConfigs.getByName("debug")
-			manifestPlaceholders["sentryDsn"] = glitchtipDsn
 		}
 		release {
-			manifestPlaceholders["sentryDsn"] = glitchtipDsn
 		}
 		create("profileable") {
 			initWith(getByName("release"))
 			isProfileable = true
 			matchingFallbacks += "release"
-			manifestPlaceholders["sentryDsn"] = glitchtipDsn
 			signingConfig = signingConfigs.getByName("debug")
 		}
 	}
@@ -260,11 +253,6 @@ tasks.register<JacocoReport>("jacocoTestReport") {
 			"outputs/unit_test_code_coverage/v8DebugUnitTest/testV8DebugUnitTest.exec",
 		),
 	)
-}
-
-// Sentry gradle plugin config (crash reporting to GlitchTip).
-sentry {
-	includeProguardMapping = false
 }
 
 kapt { arguments { arg("eventBusIndex", "${BuildConfig.PACKAGE_NAME}.events.AppEventsIndex") } }
@@ -503,13 +491,6 @@ dependencies {
 	implementation(libs.koin.android)
 	implementation(libs.androidx.security.crypto)
 
-	// Sentry Android SDK (core + replay for quality configuration); our GlitchTip client.
-	implementation(libs.sentry.core)
-	implementation(libs.sentry.android.core)
-
-	// Firebase Analytics
-	implementation(platform(libs.firebase.bom))
-	implementation(libs.firebase.analytics)
 
 	// Lifecycle Process for app lifecycle tracking
 	implementation(libs.androidx.lifecycle.process)
@@ -1143,8 +1124,6 @@ val noCompressRelease = noCompress - "so"
 
 afterEvaluate {
 	tasks.named("assembleV8Release").configure {
-		finalizedBy("recompressApk")
-
 		doLast {
 			tasks.named("recompressApk").configure {
 				extensions.extraProperties["abi"] = "v8"
@@ -1159,8 +1138,6 @@ afterEvaluate {
 	}
 
 	tasks.named("assembleV7Release").configure {
-		finalizedBy("recompressApk")
-
 		doLast {
 			tasks.named("recompressApk").configure {
 				extensions.extraProperties["abi"] = "v7"

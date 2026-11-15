@@ -7,7 +7,7 @@ permissions:
   contents: write
 
 env:
-  RELEASE_VERSION: 26.46-ar1
+  RELEASE_VERSION: 26.46-ar2
 
 jobs:
   build:
@@ -20,19 +20,33 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - name: Download bundled release assets (v8)
+      - name: Fetch release-matched bundled assets (pinned to official 26.46 APK)
         run: |
           set -euo pipefail
-          base=https://dev-assets.appdevforall.org/release
-          mkdir -p assets/release/common/data/common assets/release/common/database assets/release/v8/data/common
-          curl -fSL "$base/gradle-9.6.1-bin.zip.br"        -o assets/release/common/data/common/gradle-9.6.1-bin.zip.br
-          curl -fSL "$base/gradle-api-9.6.1.jar.br"        -o assets/release/common/data/common/gradle-api-9.6.1.jar.br
-          curl -fSL "$base/localMvnRepository.zip.br"      -o assets/release/common/data/common/localMvnRepository.zip.br
-          curl -fSL "$base/documentation.db.br"            -o assets/release/common/database/documentation.db.br
-          curl -fSL "$base/v8/android-sdk.zip.br"          -o assets/release/v8/data/common/android-sdk.zip.br
-          curl -fSL "$base/v8/bootstrap.zip.br"            -o assets/release/v8/data/common/bootstrap.zip.br
-          curl -fSL "$base/core.cgt.br"                    -o assets/release/common/data/common/core.cgt.br
-          ls -la assets/release/common/data/common assets/release/common/database assets/release/v8/data/common
+          curl -fSL "https://download.appdevforall.org/CodeOnTheGo-release26.46-armv8a.apk" -o /tmp/official.apk
+          python3 - <<'PY'
+          import zipfile, hashlib, os, sys
+          src = zipfile.ZipFile("/tmp/official.apk")
+          # APK entry -> (destination, sha256, size) pinned to official 26.46 (ADFA-signed APK)
+          assets = {
+            "assets/database/documentation.db.br":        ("assets/release/common/database/documentation.db.br",        "4d6d2dd8e567e3736ef0a09249e7a8328eb35b3c0d2d9ac9a976acd03378626c", 67064753),
+            "assets/data/common/localMvnRepository.zip.br":("assets/release/common/data/common/localMvnRepository.zip.br","854e78c9840e6995afa3f08d50c49aca1b1b431c6c34cf9ddc120aed5e7ff83f", 166597954),
+            "assets/data/common/core.cgt.br":             ("assets/release/common/data/common/core.cgt.br",             "05163a8aff2a6ad48fcd9a06e9a9ab7258bc8fa4e7c0a65384cd294621550ce2", 535784),
+            "assets/data/common/gradle-9.6.1-bin.zip.br": ("assets/release/common/data/common/gradle-9.6.1-bin.zip.br", "7271f18b3d50b5d81509a92c990fa1f114ebdd780cbfdae183e170f04ff658be", 61199108),
+            "assets/data/common/gradle-api-9.6.1.jar.br": ("assets/release/common/data/common/gradle-api-9.6.1.jar.br", "658f53aee2c9f2128afe4048ea2f22762db80bb92c42e36d02e33be3616d77ed", 29524212),
+            "assets/data/common/android-sdk.zip.br":      ("assets/release/v8/data/common/android-sdk.zip.br",          "def61720c755317db3d6d63d205bdd2a2917d68aa615a567c8062fc6c1d9911b", 64169266),
+            "assets/data/common/bootstrap.zip.br":        ("assets/release/v8/data/common/bootstrap.zip.br",            "3495d2b1128d51c0acb1a59a98d9d0e8cf3d85721d21f4c35f7ff3e0f5289108", 99409138),
+          }
+          for entry, (dest, sha, size) in assets.items():
+              data = src.read(entry)
+              ok = len(data) == size and hashlib.sha256(data).hexdigest() == sha
+              print(entry, "->", dest, len(data), "OK" if ok else "MISMATCH")
+              if not ok:
+                  sys.exit("pinned asset mismatch: " + entry)
+              os.makedirs(os.path.dirname(dest), exist_ok=True)
+              open(dest, "wb").write(data)
+          print("all 7 pinned assets verified")
+          PY
 
       - name: Build unsigned release APK (arm64 v8)
         run: ./gradlew :app:assembleV8Release -Pnext_release_version=$RELEASE_VERSION --stacktrace

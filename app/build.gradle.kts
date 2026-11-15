@@ -1124,6 +1124,8 @@ val noCompressRelease = noCompress - "so"
 
 afterEvaluate {
 	tasks.named("assembleV8Release").configure {
+		finalizedBy("recompressApk")
+
 		doLast {
 			tasks.named("recompressApk").configure {
 				extensions.extraProperties["abi"] = "v8"
@@ -1138,6 +1140,8 @@ afterEvaluate {
 	}
 
 	tasks.named("assembleV7Release").configure {
+		finalizedBy("recompressApk")
+
 		doLast {
 			tasks.named("recompressApk").configure {
 				extensions.extraProperties["abi"] = "v7"
@@ -1224,7 +1228,13 @@ fun recompressApk(
 		project.logger.lifecycle("Recompressing APK: ${apkFile.name}")
 		val tempZipFile = File(apkFile.parentFile, "${apkFile.name}.tmp")
 		recompressZip(apkFile, tempZipFile, noCompressExtensions, if (useAdvzip) advzipArgs else null)
-		signApk(tempZipFile)
+		val signingConfig =
+			android.signingConfigs.findByName("common") ?: android.signingConfigs.findByName("debug")
+		if (signingConfig?.storeFile?.exists() == true) {
+			signApk(tempZipFile)
+		} else {
+			project.logger.lifecycle("No keystore configured; leaving APK unsigned: ${apkFile.name}")
+		}
 		Files.move(
 			tempZipFile.toPath(),
 			apkFile.toPath(),

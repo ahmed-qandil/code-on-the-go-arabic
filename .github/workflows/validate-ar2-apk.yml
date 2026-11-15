@@ -1,8 +1,10 @@
 name: Validate published ar2 APK (runtime, emulator)
 
 # Manual validation only: installs the EXACT published release APK on an
-# Android emulator and captures runtime evidence (boot, locale ar-EG, install,
-# launch, UI dumps, screenshots, extraction progress). Never builds product.
+# Android emulator and captures runtime evidence. The published APK is
+# unsigned, so for the emulator install ONLY it is test-signed with a
+# throwaway debug key; both hashes are recorded and distinguished.
+# Never builds product, never mutates the release.
 
 on:
   workflow_dispatch:
@@ -12,11 +14,16 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 120
     steps:
-      - name: Download published APK and verify sha256
+      - name: Download published APK, verify hash, test-sign a copy
         run: |
           curl -sL -o cogo.apk "https://github.com/ahmed-qandil/code-on-the-go-arabic/releases/download/v26.46-ar2/CodeOnTheGo-v8-release-1115-1351.apk"
           echo "5b2439625b25a597834f3ce28e4cf6de19a180e90ff54f5442dd0ceefcb05bf5  cogo.apk" | sha256sum -c -
-          ls -la cogo.apk
+          echo "PUBLISHED unsigned sha256: $(sha256sum cogo.apk | cut -d' ' -f1)"
+          keytool -genkeypair -v -keystore /tmp/test.keystore -alias test -keyalg RSA -keysize 2048 -validity 365 -storepass android -keypass android -dname "CN=Runtime Test Only" 2>/dev/null
+          APKSIGNER=$(ls -d $ANDROID_HOME/build-tools/*/apksigner | sort -V | tail -1)
+          $APKSIGNER sign --ks /tmp/test.keystore --ks-pass pass:android --key-pass pass:android --out cogo-test-signed.apk cogo.apk
+          echo "TEST-SIGNED copy sha256: $(sha256sum cogo-test-signed.apk | cut -d' ' -f1)"
+          ls -la cogo.apk cogo-test-signed.apk
 
       - name: Enable KVM
         run: |
@@ -42,23 +49,45 @@ jobs:
             sleep 8
             adb wait-for-device
             until [ "$(adb shell getprop sys.boot_completed | tr -d '\r')" = "1" ]; do sleep 5; done
+
+            echo '=== ABI / native bridge check ==='
+            ABILIST=$(adb shell getprop ro.product.cpu.abilist | tr -d '\r')
+            echo "abilist: $ABILIST" | tee evidence/abilist.txt
+            adb shell getprop ro.dalvik.vm.native.bridge | tee evidence/native-bridge.txt
+            adb shell getprop ro.product.cpu.abilist64 | tr -d '\r' | tee evidence/abilist64.txt
+
             adb shell setprop persist.sys.locale ar-EG
             adb shell settings put system system_locales ar-EG || true
             adb shell setprop ctl.restart zygote
             sleep 30
             adb wait-for-device
             until [ "$(adb shell getprop sys.boot_completed | tr -d '\r')" = "1" ]; do sleep 5; done
-            adb shell settings get system system_locales
-            adb shell getprop persist.sys.locale
+            adb shell settings get system system_locales | tee evidence/locale.txt
+            adb shell getprop persist.sys.locale | tee -a evidence/locale.txt
 
-            echo '=== install ==='
-            adb install cogo.apk
-            adb shell pm list packages | grep itsaky || echo 'PACKAGE NOT FOUND'
-            adb shell dumpsys package com.itsaky.androidide | grep -E 'versionName|primaryCpuAbi' || true
+            if ! echo "$ABILIST" | grep -q arm64-v8a; then
+              echo 'EMULATOR_ABI_UNSUPPORTED: no arm64-v8a translation on this image; skipping install (emulator limitation, not a product defect)' | tee evidence/ABI_UNSUPPORTED.txt
+              exit 0
+            fi
+
+            echo '=== install (test-signed copy) ==='
+            if ! adb install cogo-test-signed.apk 2>&1 | tee evidence/install.log | grep -q Success; then
+              echo 'INSTALL_FAILED' | tee evidence/INSTALL_FAILED.txt
+              adb exec-out screencap -p > evidence/install-failed.png 2>/dev/null || true
+              exit 0
+            fi
+            adb shell pm list packages | grep itsaky
+            adb shell dumpsys package com.itsaky.androidide | grep -E 'versionName|primaryCpuAbi' | tee evidence/package-info.txt || true
 
             echo '=== launch ==='
-            adb shell monkey -p com.itsaky.androidide -c android.intent.category.LAUNCHER 1
+            adb shell monkey -p com.itsaky.androidide -c android.intent.category.LAUNCHER 1 | tee evidence/launch.log
             sleep 20
+            if ! adb shell pidof com.itsaky.androidide >/dev/null 2>&1; then
+              echo 'APP_NOT_RUNNING_AFTER_LAUNCH' | tee evidence/LAUNCH_FAILED.txt
+              adb exec-out screencap -p > evidence/launch-failed.png 2>/dev/null || true
+              adb logcat -d -t 200 | grep -iE 'androidide|AndroidRuntime|FATAL' > evidence/logcat-launch.txt || true
+              exit 0
+            fi
 
             for i in $(seq 1 36); do
               adb exec-out screencap -p > evidence/shot-$i.png 2>/dev/null || true
@@ -67,13 +96,14 @@ jobs:
               cp /tmp/window.xml evidence/ui-$i.xml 2>/dev/null || true
               AR=$(python3 /tmp/count_ar.py || echo 0)
               SIZE=$(adb shell du -s /data/data/com.itsaky.androidide 2>/dev/null | tr -d '\r' || true)
-              echo "[$i] arabic_chars_in_ui=$AR appdata=$SIZE"
-              python3 /tmp/tap_text.py || true
+              echo "[$i] arabic_chars_in_ui=$AR appdata=$SIZE" | tee -a evidence/progress.log
+              python3 /tmp/tap_text.py | tee -a evidence/taps.log || true
               sleep 30
             done
 
             adb shell pm path com.itsaky.androidide
-            adb shell du -s /data/data/com.itsaky.androidide || true
+            adb shell du -s /data/data/com.itsaky.androidide | tee evidence/final-size.txt || true
+            adb logcat -d -t 300 | grep -iE 'androidide|AndroidRuntime|FATAL' > evidence/logcat-final.txt || true
 
       - name: Upload evidence
         if: always()

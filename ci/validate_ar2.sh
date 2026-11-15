@@ -4,41 +4,6 @@
 # sets ar-EG locale, launches, and captures screenshots + UI dumps.
 set -x
 mkdir -p evidence
-cat > /tmp/tap_text.py <<'PY'
-import re, subprocess, sys
-targets = ['install', 'setup', 'continue', 'next', 'start', 'get started', 'done', 'agree', 'accept', 'grant', 'allow', 'ok',
-           'تثبيت', 'إعداد', 'متابعة', 'التالي', 'ابدأ', 'بدء', 'تم', 'موافق', 'سماح', 'حسنا', 'استمرار']
-try:
-    xml = open('/tmp/window.xml', encoding='utf-8').read()
-except FileNotFoundError:
-    sys.exit(0)
-nodes = re.findall(r'<node[^>]*>', xml)
-best = None
-for n in nodes:
-    text = re.search(r'text="([^"]*)"', n)
-    b = re.search(r'bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"', n)
-    enabled = re.search(r'enabled="true"', n)
-    if not (text and b and enabled):
-        continue
-    t = text.group(1).strip().lower()
-    if t and any(w in t for w in targets):
-        x = (int(b.group(1)) + int(b.group(3))) // 2
-        y = (int(b.group(2)) + int(b.group(4))) // 2
-        best = (x, y, t)
-        break
-if best:
-    print('TAPPING:', best)
-    subprocess.run(['adb', 'shell', 'input', 'tap', str(best[0]), str(best[1])])
-else:
-    print('no tappable target')
-PY
-cat > /tmp/count_ar.py <<'PY'
-try:
-    s = open('/tmp/window.xml', encoding='utf-8').read()
-    print(sum(1 for c in s if '؀' <= c <= 'ۿ'))
-except Exception:
-    print(0)
-PY
 
 adb root || true
 sleep 8
@@ -76,28 +41,37 @@ fi
 adb shell pm list packages | grep itsaky
 adb shell dumpsys package com.itsaky.androidide | grep -E 'versionName|primaryCpuAbi' | tee evidence/package-info.txt || true
 
-echo '=== launch ==='
-adb shell monkey -p com.itsaky.androidide -c android.intent.category.LAUNCHER 1 | tee evidence/launch.log
-sleep 20
-if ! adb shell pidof com.itsaky.androidide >/dev/null 2>&1; then
-  echo 'APP_NOT_RUNNING_AFTER_LAUNCH' | tee evidence/LAUNCH_FAILED.txt
-  adb exec-out screencap -p > evidence/launch-failed.png 2>/dev/null || true
-  adb logcat -d -t 300 | grep -iE 'androidide|AndroidRuntime|FATAL' > evidence/logcat-launch.txt || true
-  exit 0
-fi
+echo '=== resolve launchable activity ==='
+AAPT=$(ls -d $ANDROID_HOME/build-tools/*/aapt | sort -V | tail -1)
+$AAPT dump badging cogo-test-signed.apk | grep -E 'launchable-activity|package:' | tee evidence/badging.txt
+ACT=$(grep "launchable-activity" evidence/badging.txt | sed "s/.*name='\([^']*\)'.*/\1/")
+echo "resolved activity: $ACT" | tee evidence/activity.txt
 
-for i in $(seq 1 36); do
-  adb exec-out screencap -p > evidence/shot-$i.png 2>/dev/null || true
-  adb shell uiautomator dump /sdcard/window.xml >/dev/null 2>&1 || true
-  adb pull /sdcard/window.xml /tmp/window.xml >/dev/null 2>&1 || true
-  cp /tmp/window.xml evidence/ui-$i.xml 2>/dev/null || true
-  AR=$(python3 /tmp/count_ar.py || echo 0)
-  SIZE=$(adb shell du -s /data/data/com.itsaky.androidide 2>/dev/null | tr -d '\r' || true)
-  echo "[$i] arabic_chars_in_ui=$AR appdata=$SIZE" | tee -a evidence/progress.log
-  python3 /tmp/tap_text.py | tee -a evidence/taps.log || true
-  sleep 30
+echo '=== launch (explicit am start -W, continuous unfiltered logcat) ==='
+adb logcat -c || true
+adb logcat > evidence/logcat-full.txt 2>&1 &
+LOGCAT_PID=$!
+adb shell am start -W -n "com.itsaky.androidide/$ACT" 2>&1 | tee evidence/am-start.log
+
+for i in $(seq 1 18); do
+  PID=$(adb shell pidof com.itsaky.androidide | tr -d '\r')
+  FOCUS=$(adb shell dumpsys activity activities 2>/dev/null | grep -E 'mResumedActivity|topResumedActivity' | tr -d '\r' || true)
+  echo "[$((i*10))s] pid=$PID focus=$FOCUS" | tee -a evidence/observe.log
+  if [ $((i % 3)) -eq 0 ]; then
+    adb exec-out screencap -p > evidence/launch-$i.png 2>/dev/null || true
+  fi
+  sleep 10
 done
 
-adb shell pm path com.itsaky.androidide
+adb exec-out screencap -p > evidence/launch-final.png 2>/dev/null || true
+kill $LOGCAT_PID 2>/dev/null || true
+
+echo '=== crash evidence ==='
+adb shell ls /data/tombstones/ 2>/dev/null | tee evidence/tombstones-list.txt || true
+LATEST=$(adb shell ls -t /data/tombstones/ 2>/dev/null | head -1 | tr -d '\r')
+if [ -n "$LATEST" ]; then
+  adb shell cat "/data/tombstones/$LATEST" > evidence/tombstone-latest.txt 2>/dev/null || true
+fi
+adb shell dumpsys dropbox --print 2>/dev/null | grep -B2 -A40 -iE 'crash|anr|itsaky' | head -200 > evidence/dropbox.txt || true
+adb shell pidof com.itsaky.androidide | tee evidence/final-pid.txt || true
 adb shell du -s /data/data/com.itsaky.androidide | tee evidence/final-size.txt || true
-adb logcat -d -t 300 | grep -iE 'androidide|AndroidRuntime|FATAL' > evidence/logcat-final.txt || true

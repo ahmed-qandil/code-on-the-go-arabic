@@ -276,47 +276,6 @@
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize"
             android:windowSoftInputMode="adjustResize" />
 
-        <!-- Crash/log reporting. These io.sentry.* keys configure the Sentry SDK,
-             which reports to our GlitchTip backend (GlitchTip speaks the Sentry
-             protocol); ${sentryDsn} carries the GlitchTip DSN. -->
-        <!-- Required: the GlitchTip project identifier (DSN) -->
-        <meta-data
-            android:name="io.sentry.dsn"
-            android:value="${sentryDsn}" />
-        <!-- enable automatic breadcrumbs for user interactions (clicks, swipes, scrolls) -->
-        <meta-data
-            android:name="io.sentry.traces.user-interaction.enable"
-            android:value="true" />
-        <!-- enable screenshot for crashes -->
-        <meta-data
-            android:name="io.sentry.attach-screenshot"
-            android:value="true" />
-        <!-- enable view hierarchy for crashes -->
-        <meta-data
-            android:name="io.sentry.attach-view-hierarchy"
-            android:value="true" />
-        <!-- enable the performance API by setting a sample-rate, adjust in production env -->
-        <meta-data
-            android:name="io.sentry.traces.sample-rate"
-            android:value="0.0" />
-        <meta-data
-            android:name="io.sentry.send-default-pii"
-            android:value="true" />
-        <!-- Enable logs to be sent to GlitchTip -->
-        <meta-data
-            android:name="io.sentry.logs.enabled"
-            android:value="true" />
-
-        <!-- Suppress SDK auto-init; re-enabled at runtime only with telemetry consent -->
-        <meta-data
-            android:name="io.sentry.auto-init"
-            android:value="false" />
-        <meta-data
-            android:name="firebase_analytics_collection_enabled"
-            android:value="false" />
-        <meta-data
-            android:name="firebase_data_collection_default_enabled"
-            android:value="false" />
         <provider
             android:name=".provider.IDEDocumentsProvider"
             android:authorities="com.itsaky.androidide.documents"

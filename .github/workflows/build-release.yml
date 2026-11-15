@@ -1,0 +1,76 @@
+name: build-release
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  RELEASE_VERSION: 26.46-ar1
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Download bundled release assets (v8)
+        run: |
+          set -euo pipefail
+          base=https://dev-assets.appdevforall.org/release
+          cd app
+          mkdir -p assets/release/common/data/common assets/release/common/database assets/release/v8/data/common
+          curl -fSL "$base/gradle-9.6.1-bin.zip.br"        -o assets/release/common/data/common/gradle-9.6.1-bin.zip.br
+          curl -fSL "$base/gradle-api-9.6.1.jar.br"        -o assets/release/common/data/common/gradle-api-9.6.1.jar.br
+          curl -fSL "$base/localMvnRepository.zip.br"      -o assets/release/common/data/common/localMvnRepository.zip.br
+          curl -fSL "$base/documentation.db.br"            -o assets/release/common/database/documentation.db.br
+          curl -fSL "$base/v8/android-sdk.zip.br"          -o assets/release/v8/data/common/android-sdk.zip.br
+          curl -fSL "$base/v8/bootstrap.zip.br"            -o assets/release/v8/data/common/bootstrap.zip.br
+          curl -fSL "$base/core.cgt.br"                    -o assets/release/common/data/common/core.cgt.br
+          ls -la assets/release/common/data/common assets/release/common/database assets/release/v8/data/common
+
+      - name: Build unsigned release APK (arm64 v8)
+        run: ./gradlew :app:assembleV8Release -Pnext_release_version=$RELEASE_VERSION --stacktrace
+
+      - name: Locate APK
+        id: apk
+        run: |
+          apk=$(find app/build/outputs/apk -name '*.apk' | head -1)
+          echo "path=$apk" >> "$GITHUB_OUTPUT"
+          echo "name=$(basename "$apk")" >> "$GITHUB_OUTPUT"
+
+      - name: Verify APK (unsigned, arm64-only, Arabic strings)
+        env:
+          APK_PATH: ${{ steps.apk.outputs.path }}
+        run: |
+          python3 - <<'PY'
+          import zipfile, sys, os
+          apk = os.environ["APK_PATH"]
+          z = zipfile.ZipFile(apk)
+          names = z.namelist()
+          sig = [n for n in names if n.startswith("META-INF/") and n.rsplit(".",1)[-1].upper() in ("RSA","SF","DSA","EC")]
+          print("signature entries:", sig)
+          assert not sig, "APK is signed!"
+          abis = sorted({n.split("/")[1] for n in names if n.startswith("lib/")})
+          print("ABIs:", abis)
+          assert abis == ["arm64-v8a"], abis
+          print("size MB:", len(open(apk,'rb').read())//1024//1024)
+          PY
+
+      - name: Package source zip
+        run: git archive -o "code-on-the-go-arabic-$RELEASE_VERSION-source.zip" HEAD
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ env.RELEASE_VERSION }}
+          name: Code on the Go Arabic ${{ env.RELEASE_VERSION }}
+          files: |
+            ${{ steps.apk.outputs.path }}
+            code-on-the-go-arabic-${{ env.RELEASE_VERSION }}-source.zip
